@@ -7,8 +7,6 @@ pandas
 numpy
 scikit-learn
 spacy
-transformers
-torch
 pypdf
 pdfplumber
 python-jose[cryptography]

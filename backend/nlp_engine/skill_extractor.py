@@ -1,6 +1,4 @@
 import spacy
-from transformers import AutoTokenizer, AutoModel
-import torch
 import numpy as np
 import re
 
@@ -12,10 +10,8 @@ except OSError:
     # Fallback to loading the model explicitly / downloading instructions during production
     pass
 
-# 2. HuggingFace BERT for vector embeddings (Domain vocabulary mapping without training)
-# Using a lightweight sentence-transformer for quick inference
-tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-bert_model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+# Note: HuggingFace BERT (transformers/torch) was removed to prevent Out-of-Memory (OOM) 
+# crashes on free cloud tiers (512MB RAM limits). The vectors were not used by downstream modules.
 
 def extract_entities(text: str) -> list[str]:
     """
@@ -91,37 +87,10 @@ def clean_extracted_skills(text: str) -> dict:
 
 def get_bert_embeddings(skill_list: list[str]) -> dict[str, np.ndarray]:
     """
-    Generates BERT contextual embeddings for the extracted skill tokens.
-    These vectors will be used later in Module 4 to run cosine similarity against
-    Job Data required skills.
-    
-    Args:
-        skill_list: List of extracted text tokens.
-        
-    Returns:
-        Dictionary mapping the skill string to its numeric vector representation.
+    Skipped BERT embedding generation to save RAM.
+    Returns an empty dict. Downstream uses TF-IDF + Cosine Similarity.
     """
-    skill_embeddings = {}
-    
-    for skill in skill_list:
-        # Tokenize and run through the transformer
-        encoded_input = tokenizer(skill, padding=True, truncation=True, return_tensors='pt')
-        with torch.no_grad():
-            model_output = bert_model(**encoded_input)
-            
-        # Mean Pooling - Take attention mask into account for correct averaging
-        attention_mask = encoded_input['attention_mask']
-        token_embeddings = model_output.last_hidden_state
-        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
-        
-        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
-        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
-        pooled_embedding = sum_embeddings / sum_mask
-        
-        # Convert to flat numpy array for easier storage/computation
-        skill_embeddings[skill] = pooled_embedding.numpy().flatten()
-        
-    return skill_embeddings
+    return {}
 
 def process_resume_text(text: str) -> dict:
     """
