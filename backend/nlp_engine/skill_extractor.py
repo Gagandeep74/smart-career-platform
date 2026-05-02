@@ -5,9 +5,9 @@ import numpy as np
 import re
 
 # Load Pre-trained NLP Models
-# 1. SpaCy en_core_web_md (Medium English model) for lemmatization, stop words, and standard NER
+# 1. SpaCy en_core_web_sm (Small English model) for lemmatization, stop words, and standard NER
 try:
-    nlp = spacy.load("en_core_web_md")
+    nlp = spacy.load("en_core_web_sm")
 except OSError:
     # Fallback to loading the model explicitly / downloading instructions during production
     pass
