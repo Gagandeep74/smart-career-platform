@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-career-bg: #f8fafc;
+  --color-career-primary: #2563eb;
+  --color-career-secondary: #0f172a;
+  --color-career-accent: #3b82f6;
+  --color-career-border: #e2e8f0;
+  
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-headline: 'Space Grotesk', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-label: 'Inter', sans-serif;
+
+  /* Stitch Neon Architect System */
+  --color-error-dim: #d7383b;
+  --color-surface-dim: #0c0e11;
+  --color-on-secondary: #004d58;
+  --color-tertiary: #64b3ff;
+  --color-on-tertiary-container: #002440;
+  --color-surface-variant: #23262a;
+  --color-tertiary-fixed-dim: #49a8fc;
+  --color-background: #0c0e11;
+  --color-error-container: #9f0519;
+  --color-surface-container-highest: #23262a;
+  --color-on-surface-variant: #aaabaf;
+  --color-on-surface: #f9f9fd;
+  --color-secondary-container: #006876;
+  --color-surface-tint: #a1faff;
+  --color-outline: #747579;
+  --color-on-tertiary-fixed-variant: #003c65;
+  --color-on-tertiary: #003053;
+  --color-primary-dim: #00e5ee;
+  --color-secondary: #00e3fe;
+  --color-on-tertiary-fixed: #00192f;
+  --color-on-secondary-container: #e9fbff;
+  --color-secondary-fixed-dim: #00d7f1;
+  --color-tertiary-fixed: #6bb6ff;
+  --color-on-primary: #006165;
+  --color-error: #ff716c;
+  --color-primary: #a1faff;
+  --color-surface-container-lowest: #000000;
+  --color-on-error: #490006;
+  --color-tertiary-dim: #41a3f7;
+  --color-on-error-container: #ffa8a3;
+  --color-inverse-primary: #006a6e;
+  --color-surface-container-low: #111417;
+  --color-primary-fixed: #00f4fe;
+  --color-primary-fixed-dim: #00e5ee;
+  --color-inverse-surface: #f9f9fd;
+  --color-on-background: #f9f9fd;
+  --color-surface-bright: #292c31;
+  --color-surface-container: #171a1d;
+  --color-on-secondary-fixed: #003a42;
+  --color-on-primary-fixed: #004346;
+  --color-on-primary-container: #00575b;
+  --color-surface-container-high: #1d2024;
+  --color-on-primary-fixed-variant: #006266;
+  --color-on-secondary-fixed-variant: #005965;
+  --color-secondary-fixed: #37e5ff;
+  --color-primary-container: #00f4fe;
+  --color-inverse-on-surface: #535559;
+  --color-tertiary-container: #45a6fa;
+  --color-secondary-dim: #00d4ee;
+  --color-outline-variant: #46484b;
+  --color-surface: #0c0e11;
+}
+
+body {
+  background-color: var(--color-career-bg);
+  color: var(--color-career-secondary);
+  font-family: var(--font-inter);
+}
+
+.saas-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  border: 1px solid var(--color-career-border);
+}
+
+.saas-button {
+  background-color: var(--color-career-primary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.saas-button:hover {
+  background-color: var(--color-career-accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.saas-button-outline {
+  background-color: transparent;
+  color: var(--color-career-secondary);
+  border: 1px solid var(--color-career-border);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+}
+
+.saas-button-outline:hover {
+  background-color: #f1f5f9;
+}

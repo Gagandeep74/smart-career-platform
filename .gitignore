@@ -1,0 +1,16 @@
+# Git ignore rules
+__pycache__/
+*.pyc
+*.pyo
+*.db
+.env
+.env.local
+venv/
+.venv/
+node_modules/
+.next/
+*.egg-info/
+dist/
+build/
+.DS_Store
+Thumbs.db
