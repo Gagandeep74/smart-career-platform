@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, UploadCloud, FileText, Cpu, CheckCircle } from 'lucide-react';
+import { ArrowLeft, UploadCloud, FileText, Cpu, CheckCircle, ExternalLink } from 'lucide-react';
 import { Tilt } from 'react-tilt';
 import { CareerAPI } from '@/lib/api';
 
@@ -13,6 +13,11 @@ export default function V2UploadPage() {
   const [isHovering, setIsHovering] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [result, setResult] = useState<{
+    detected_skills: string[];
+    structured_content?: Record<string, unknown>;
+  } | null>(null);
+  const [error, setError] = useState('');
 
   const defaultOptions = {
     reverse: false,  // reverse the tilt direction
@@ -43,18 +48,24 @@ export default function V2UploadPage() {
   const executeNeuralScan = async () => {
     if (!file) return;
     setIsScanning(true);
+    setError('');
     
     try {
       const res = await CareerAPI.uploadResume(file);
+      setResult(res);
       if (typeof window !== 'undefined') {
         localStorage.setItem('recent_skills', JSON.stringify(res.detected_skills));
         localStorage.setItem('skill_scores', JSON.stringify(res.skill_scores || {}));
+        localStorage.setItem('resume_import_draft', JSON.stringify(res.structured_content || {}));
       }
-      setTimeout(() => router.push('/dashboard'), 2500);
     } catch (e) {
-      console.error(e);
-      setTimeout(() => router.push('/dashboard'), 2500);
+      setError(e instanceof Error ? e.message : 'Resume analysis failed');
+      setIsScanning(false);
     }
+  };
+
+  const importToStudio = () => {
+    router.push('/resume-builder');
   };
 
   return (
@@ -119,6 +130,37 @@ export default function V2UploadPage() {
                       Initiate Scan
                     </button>
                   </motion.div>
+                ) : result ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full rounded-[2rem] border border-emerald-500/30 bg-slate-900/80 p-6 text-left backdrop-blur-xl"
+                  >
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-8 w-8 text-emerald-400" />
+                      <div>
+                        <h2 className="text-xl font-black text-white">Resume analysis complete</h2>
+                        <p className="text-sm text-slate-400">Review the extracted information in Resume Studio before saving.</p>
+                      </div>
+                    </div>
+                    <div className="mt-6 grid gap-4 md:grid-cols-2">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Detected skills</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {result.detected_skills.map((skill) => <span key={skill} className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-blue-200">{skill}</span>)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Structured sections</p>
+                        <p className="mt-3 text-sm text-slate-300">
+                          {Object.entries(result.structured_content || {}).filter(([, value]) => Array.isArray(value) ? value.length : Boolean(value)).map(([key]) => key).join(', ') || 'Skills and profile data'}
+                        </p>
+                      </div>
+                    </div>
+                    <button onClick={importToStudio} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500">
+                      Import to Resume Studio <ExternalLink className="h-4 w-4" />
+                    </button>
+                  </motion.div>
                 ) : (
                     <label className="flex flex-col items-center gap-4 text-slate-400 cursor-pointer">
                       <div className={`w-20 h-20 rounded-full flex items-center justify-center border transition-colors ${isHovering ? 'bg-blue-500/20 border-blue-400' : 'bg-slate-800/50 border-white/10'}`}>
@@ -126,9 +168,10 @@ export default function V2UploadPage() {
                       </div>
                       <p className="text-lg font-medium text-white">Drop your PDF here</p>
                       <p className="text-sm">or click to manually browse system directories</p>
-                      <input type="file" className="hidden" accept=".pdf,.docx,.txt" onChange={handleSelectFile} />
+                      <input type="file" className="hidden" accept=".pdf,.txt" onChange={handleSelectFile} />
                     </label>
                 )}
+                {error && <p className="mt-4 rounded-lg border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</p>}
               </AnimatePresence>
             </div>
           </Tilt>

@@ -1,5 +1,64 @@
 @import "tailwindcss";
 
+.editor-input, .editor-textarea {
+  width: 100%;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 0.75rem;
+  background: rgb(15 23 42 / 0.8);
+  color: white;
+  padding: 0.7rem 0.8rem;
+  outline: none;
+}
+
+.editor-input:focus, .editor-textarea:focus {
+  border-color: rgb(96 165 250);
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.15);
+}
+
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 0.6rem;
+  background: rgb(37 99 235 / 0.2);
+  color: rgb(147 197 253);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.template-classic h2, .template-classic h3 {
+  font-family: Georgia, serif;
+}
+
+.template-minimal {
+  font-size: 0.9rem;
+}
+
+.template-minimal section {
+  margin-top: 1.1rem;
+}
+
+.latex-editor {
+  width: 100%;
+  min-height: 28rem;
+  resize: vertical;
+  border: 1px solid rgb(34 211 238 / 0.2);
+  border-radius: 0.75rem;
+  background: #020617;
+  color: #a5f3fc;
+  padding: 1rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  outline: none;
+}
+
+.latex-editor:focus {
+  border-color: rgb(34 211 238 / 0.7);
+  box-shadow: 0 0 0 3px rgb(34 211 238 / 0.1);
+}
+
 @theme {
   --color-career-bg: #f8fafc;
   --color-career-primary: #2563eb;

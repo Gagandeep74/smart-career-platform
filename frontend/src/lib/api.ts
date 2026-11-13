@@ -8,10 +8,18 @@ function getAuthHeaders(): Record<string, string> {
   return token ? { 'Authorization': `Bearer ${token}` } : {};
 }
 
+interface SignupData {
+  name: string;
+  email: string;
+  password: string;
+  current_role?: string;
+  target_role?: string;
+}
+
 export const CareerAPI = {
 
   // --- IDENTITY MODULE --- //
-  async signup(data: any) {
+  async signup(data: SignupData) {
     const response = await fetch(`${API_BASE_URL}/auth/signup`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -19,6 +27,26 @@ export const CareerAPI = {
     });
     if (!response.ok) throw new Error('Signup Failed - Email likely exists.');
     return response.json();
+  },
+
+  async updateCertificate(id: number, data: {
+    name: string; issuer: string; issue_date: string; expiry_date?: string;
+    credential_id?: string; credential_url?: string; skills: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/profile/certificates/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to update certificate');
+    return response.json();
+  },
+
+  async deleteCertificate(id: number) {
+    const response = await fetch(`${API_BASE_URL}/profile/certificates/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Unable to delete certificate');
   },
 
   async login(email: string, password: string) {
@@ -41,6 +69,45 @@ export const CareerAPI = {
     return response.json();
   },
 
+  async listApplications() {
+    const response = await fetch(`${API_BASE_URL}/applications`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load saved jobs');
+    return response.json();
+  },
+
+  async saveApplication(data: {
+    external_job_id: string; title: string; company?: string; apply_url?: string;
+    status?: string; notes?: string; follow_up_date?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/applications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to save job');
+    return response.json();
+  },
+
+  async updateApplication(id: number, data: {
+    external_job_id: string; title: string; company?: string; apply_url?: string;
+    status?: string; notes?: string; follow_up_date?: string;
+  }) {
+    const response = await fetch(`${API_BASE_URL}/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to update application');
+    return response.json();
+  },
+
+  async deleteApplication(id: number) {
+    const response = await fetch(`${API_BASE_URL}/applications/${id}`, {
+      method: 'DELETE', headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Unable to remove saved job');
+  },
+
   async getProfile() {
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
       headers: { ...getAuthHeaders() }
@@ -51,24 +118,24 @@ export const CareerAPI = {
 
   // --- NLP MODULE --- //
   async uploadResume(file: File) {
-    // Dynamic fetching of authorized ID
-    let userId = localStorage.getItem('user_id') || "1";
-    
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await fetch(`${API_BASE_URL}/upload-resume/?user_id=${userId}`, {
+    const response = await fetch(`${API_BASE_URL}/upload-resume/`, {
       method: 'POST',
       headers: { ...getAuthHeaders() },  // Secure Authorization Hook
       body: formData,
     });
     
-    if (!response.ok) throw new Error('NLP Parsing Security Restraint');
+    if (!response.ok) {
+      const error = await response.json().catch(() => null);
+      throw new Error(error?.detail || 'Unable to analyze resume');
+    }
     return response.json();
   },
 
   // --- RECOMMENDATION MODULES --- //
-  async getJobRecommendations(userSkills: string[] = [], userId: number = 1) {
+  async getJobRecommendations(userSkills: string[] = []) {
     const response = await fetch(`${API_BASE_URL}/recommend-jobs`, {
       method: 'POST',
       headers: {
@@ -118,6 +185,98 @@ export const CareerAPI = {
     });
     
     if (!response.ok) throw new Error('Path analyzer routing failed.');
+    return response.json();
+  },
+
+  async listCertificates() {
+    const response = await fetch(`${API_BASE_URL}/profile/certificates`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load certificates');
+    return response.json();
+  },
+
+  async importResumeProfile() {
+    const response = await fetch(`${API_BASE_URL}/profile/resume-import`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to import profile');
+    return response.json();
+  },
+
+  async getExpiringCertificates(days = 60) {
+    const response = await fetch(`${API_BASE_URL}/profile/certificates/expiring?days=${days}`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load certificate reminders');
+    return response.json();
+  },
+
+  async getAtsScore(jobId: number) {
+    const response = await fetch(`${API_BASE_URL}/profile/ats-score/${jobId}`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to calculate ATS score');
+    return response.json();
+  },
+
+  async addCertificate(data: {
+    name: string;
+    issuer: string;
+    issue_date: string;
+    expiry_date?: string;
+    credential_id?: string;
+    credential_url?: string;
+    skills: string[];
+  }) {
+    const response = await fetch(`${API_BASE_URL}/profile/certificates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to save certificate');
+    return response.json();
+  },
+
+  async listResumeDocuments() {
+    const response = await fetch(`${API_BASE_URL}/resume-documents`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load resumes');
+    return response.json();
+  },
+
+  async createResumeDocument(data: { title: string; template: string; content: Record<string, unknown> }) {
+    const response = await fetch(`${API_BASE_URL}/resume-documents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to create resume');
+    return response.json();
+  },
+
+  async updateResumeDocument(id: number, data: { title: string; template: string; content: Record<string, unknown> }) {
+    const response = await fetch(`${API_BASE_URL}/resume-documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Unable to save resume');
+    return response.json();
+  },
+
+  async listResumeVersions(id: number) {
+    const response = await fetch(`${API_BASE_URL}/resume-documents/${id}/versions`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load resume versions');
+    return response.json();
+  },
+
+  async createResumeVersion(id: number, label: string) {
+    const response = await fetch(`${API_BASE_URL}/resume-documents/${id}/versions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ label }),
+    });
+    if (!response.ok) throw new Error('Unable to save resume version');
+    return response.json();
+  },
+
+  async restoreResumeVersion(resumeId: number, versionId: number) {
+    const response = await fetch(`${API_BASE_URL}/resume-documents/${resumeId}/versions/${versionId}/restore`, {
+      method: 'POST', headers: getAuthHeaders()
+    });
+    if (!response.ok) throw new Error('Unable to restore resume version');
     return response.json();
   }
 };

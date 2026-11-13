@@ -1,6 +1,6 @@
 'use client';
 
-import { Home, Briefcase, Map, Settings, Upload } from 'lucide-react';
+import { Home, Briefcase, Map, Settings, Upload, FilePenLine, Award, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 
@@ -10,6 +10,9 @@ export default function Sidebar() {
     { label: 'Resume Upload', icon: Upload, path: '/upload' },
     { label: 'Job Hub', icon: Briefcase, path: '/jobs' },
     { label: 'Roadmap', icon: Map, path: '/roadmap' },
+    { label: 'Resume Builder', icon: FilePenLine, path: '/resume-builder' },
+    { label: 'Certificates', icon: Award, path: '/profile/certificates' },
+    { label: 'Applications', icon: ClipboardList, path: '/applications' },
   ];
 
   return (

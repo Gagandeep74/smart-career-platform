@@ -47,6 +47,7 @@ interface JobRecommendation {
     estimated_difficulty: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
   };
   description?: string;
+  preferred_certifications?: string[];
 }
 
 interface RecommendationResponse {
@@ -66,6 +67,9 @@ export default function JobRecommendationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  const [atsScores, setAtsScores] = useState<Record<string, { score: number; matched_certificates: string[]; missing_certifications: string[] }>>({});
+  const [savedJobs, setSavedJobs] = useState<Record<string, number>>({});
+  const [applicationMessage, setApplicationMessage] = useState<string | null>(null);
 
   // --- Smart Filters State ---
   const [searchQuery, setSearchQuery] = useState('');
@@ -150,8 +154,43 @@ export default function JobRecommendationsPage() {
       CareerAPI.getProfile().then(p => {
         if (p) setUserProfile({ name: p.name, email: p.email });
       }).catch(() => {});
+      CareerAPI.listApplications().then((items) => {
+        const saved = Object.fromEntries(items.map((item: { external_job_id: string; id: number }) => [item.external_job_id, item.id]));
+        setSavedJobs(saved);
+      }).catch(() => {});
     }
   }, []);
+
+  const loadAtsScore = async (job: JobRecommendation) => {
+    if (atsScores[job.id]) return;
+    const match = /^db_(\d+)$/.exec(job.id);
+    if (!match) {
+      setApplicationMessage('ATS scoring is available for indexed jobs. Live jobs use the displayed match score.');
+      return;
+    }
+    try {
+      const score = await CareerAPI.getAtsScore(Number(match[1]));
+      setAtsScores((current) => ({ ...current, [job.id]: score }));
+    } catch (error) {
+      setApplicationMessage(error instanceof Error ? error.message : 'Unable to calculate ATS score');
+    }
+  };
+
+  const saveJob = async (job: JobRecommendation) => {
+    try {
+      const result = await CareerAPI.saveApplication({
+        external_job_id: job.id,
+        title: job.title,
+        company: job.company,
+        apply_url: job.apply_url,
+        status: 'saved',
+      });
+      setSavedJobs((current) => ({ ...current, [job.id]: result.id }));
+      setApplicationMessage(`${job.title} saved to your application tracker.`);
+    } catch (error) {
+      setApplicationMessage(error instanceof Error ? error.message : 'Sign in to save jobs');
+    }
+  };
 
   // --- Filter Logic ---
   const filteredJobs = useMemo(() => {
@@ -631,6 +670,7 @@ export default function JobRecommendationsPage() {
           <div className="space-y-4">
             {filteredJobs.slice(0, visibleCount).map((job) => {
               const isExpanded = expandedJobId === job.id;
+              const ats = atsScores[job.id];
               
               // Source color badge
               const sourceBadge = job.source === 'Database' 
@@ -723,6 +763,13 @@ export default function JobRecommendationsPage() {
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap items-center gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => saveJob(job)}
+                            className={`px-3 py-1.5 border text-[11px] font-bold rounded-xl transition-colors ${savedJobs[job.id] ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-white/10 bg-slate-950 text-slate-300 hover:text-white'}`}
+                          >
+                            {savedJobs[job.id] ? 'Saved to tracker' : 'Save job'}
+                          </button>
                           {job.apply_url && job.apply_url !== '#' && (
                             <a
                               href={job.apply_url}
@@ -745,6 +792,7 @@ export default function JobRecommendationsPage() {
                             </a>
                           ))}
                         </div>
+                        {applicationMessage && <p className="text-xs text-cyan-300">{applicationMessage}</p>}
                       </div>
 
                       {/* Right: Match Score & Accordion Toggle */}
@@ -762,12 +810,19 @@ export default function JobRecommendationsPage() {
 
                         <button
                           type="button"
-                          onClick={() => setExpandedJobId(isExpanded ? null : job.id)}
+                          onClick={() => {
+                            setExpandedJobId(isExpanded ? null : job.id);
+                            if (!isExpanded) loadAtsScore(job);
+                          }}
                           className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold text-slate-300 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                         >
                           <span>{isExpanded ? 'Hide AI Deep Dive' : 'AI Reason & Roadmap'}</span>
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
+                        <div className="text-center min-w-[110px]">
+                          <span className="block text-[9px] uppercase tracking-widest text-slate-500">ATS score</span>
+                          <span className="text-lg font-black text-cyan-300">{ats ? `${Math.round(ats.score)}%` : '—'}</span>
+                        </div>
                       </div>
 
                     </div>
@@ -784,6 +839,16 @@ export default function JobRecommendationsPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="border-t border-white/10 bg-slate-950/60 p-6 lg:p-8 space-y-6"
                       >
+                        {ats && (
+                          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-cyan-300 mb-3">ATS readiness</h4>
+                            <div className="grid gap-3 sm:grid-cols-3 text-xs">
+                              <div><span className="text-slate-500 block">Resume score</span><strong className="text-xl text-white">{Math.round(ats.score)}%</strong></div>
+                              <div><span className="text-slate-500 block">Matched certificates</span><span className="text-emerald-300">{ats.matched_certificates.length ? ats.matched_certificates.join(', ') : 'None yet'}</span></div>
+                              <div><span className="text-slate-500 block">Missing certifications</span><span className="text-amber-300">{ats.missing_certifications.length ? ats.missing_certifications.join(', ') : 'None'}</span></div>
+                            </div>
+                          </div>
+                        )}
                         {/* 4. AI Recommendation Reason */}
                         <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/20 space-y-3">
                           <div className="flex items-center justify-between">

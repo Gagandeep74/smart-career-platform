@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core import models
@@ -13,8 +13,15 @@ from pydantic import BaseModel
 router = APIRouter(tags=["Learning Roadmap (Module 5 & 9)"])
 
 @router.get("/roadmap/{user_id}/{job_id}")
-def generate_roadmap(user_id: int, job_id: int, db: Session = Depends(get_db)):
+def generate_roadmap(
+    user_id: int,
+    job_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """ Analyzes Skill Gap between User & Job, then returns curated course map """
+    if user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Roadmap not found")
     
     # 1. Base User Skills extraction
     user_skills_db = db.query(models.UserSkill).filter_by(user_id=user_id).all()
@@ -134,7 +141,11 @@ class CareerPathsRequest(BaseModel):
     extracted_skills: list[str] = []
 
 @router.post("/roadmap/analyze-career-paths")
-def analyze_career_paths(request: CareerPathsRequest, db: Session = Depends(get_db)):
+def analyze_career_paths(
+    request: CareerPathsRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     Evaluates user skills against predefined core industry domains to
     suggest the top career paths. Computes match %, gaps, and roadmaps.
@@ -142,7 +153,7 @@ def analyze_career_paths(request: CareerPathsRequest, db: Session = Depends(get_
     # 1. Resolve User Skills
     user_skills = request.extracted_skills
     if not user_skills:
-        user_skills_db = db.query(models.UserSkill).filter_by(user_id=1).all()
+        user_skills_db = db.query(models.UserSkill).filter_by(user_id=current_user.id).all()
         user_skills = [s.skill_name for s in user_skills_db]
         
     # 2. Define standard tech career pathways and their core required skills

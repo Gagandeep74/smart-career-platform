@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from backend.core.database import get_db
 from backend.core import models
@@ -9,6 +9,7 @@ from backend.ML_models.matcher import (
     generate_platform_links
 )
 from backend.nlp_engine.skill_extractor import clean_extracted_skills
+from backend.api.routes_auth import get_current_user
 from pydantic import BaseModel
 import re
 
@@ -29,64 +30,80 @@ def _seed_db_jobs_if_empty(db: Session):
                 company="Nexus Cloud Systems",
                 description="Lead development of distributed microservices, REST APIs, and event pipelines. Required skills: Python, FastAPI, PostgreSQL, Docker, Redis, Git, AWS.",
                 required_skills=["python", "fastapi", "postgresql", "docker", "redis", "git", "aws"],
+                preferred_certifications=["AWS Certified Developer - Associate"],
                 cluster_id=1,
-                external_url="https://www.linkedin.com/jobs"
+                external_url="https://www.linkedin.com/jobs",
+                salary_min=110000, salary_max=155000
             ),
             models.Job(
                 title="Machine Learning & AI Engineer",
                 company="Cortex Cognitive Lab",
                 description="Develop deep learning models, LLM pipelines, and NLP systems. Required skills: Python, PyTorch, TensorFlow, Machine Learning, NLP, Docker, SQL.",
                 required_skills=["python", "pytorch", "tensorflow", "machine learning", "nlp", "docker", "sql"],
+                preferred_certifications=["TensorFlow Developer Certificate"],
                 cluster_id=2,
-                external_url="https://www.indeed.com/jobs"
+                external_url="https://www.indeed.com/jobs",
+                salary_min=120000, salary_max=175000
             ),
             models.Job(
                 title="Cloud DevOps & Platform Architect",
                 company="Skyline Infrastructure",
                 description="Build scalable Kubernetes clusters, CI/CD automation, and cloud security. Required skills: AWS, Kubernetes, Docker, Terraform, Linux, CI/CD, Python.",
                 required_skills=["aws", "kubernetes", "docker", "terraform", "linux", "git", "python"],
+                preferred_certifications=["AWS Certified Solutions Architect - Associate", "CKA"],
                 cluster_id=3,
-                external_url="https://www.google.com/search?q=devops+jobs"
+                external_url="https://www.google.com/search?q=devops+jobs",
+                salary_min=125000, salary_max=180000
             ),
             models.Job(
                 title="Full Stack Software Engineer",
                 company="Apex Digital Labs",
                 description="Build interactive Next.js interfaces and robust backend APIs. Required skills: React, TypeScript, Node.js, Python, PostgreSQL, CSS, Docker.",
                 required_skills=["react", "typescript", "python", "postgresql", "css", "docker", "javascript"],
+                preferred_certifications=["Meta Front-End Developer Certificate"],
                 cluster_id=4,
-                external_url="https://www.linkedin.com/jobs"
+                external_url="https://www.linkedin.com/jobs",
+                salary_min=95000, salary_max=145000
             ),
             models.Job(
                 title="Data Platform Engineer",
                 company="StreamScale Analytics",
                 description="Design real-time ETL pipelines and high-throughput data lakes. Required skills: Python, SQL, Spark, Pandas, Airflow, AWS, Docker.",
                 required_skills=["python", "sql", "pandas", "aws", "docker", "git"],
+                preferred_certifications=["AWS Certified Data Analytics - Specialty"],
                 cluster_id=5,
-                external_url="https://www.indeed.com/jobs"
+                external_url="https://www.indeed.com/jobs",
+                salary_min=105000, salary_max=160000
             ),
             models.Job(
                 title="Cybersecurity Systems Analyst",
                 company="CyberShield Defense",
                 description="Perform threat modeling, penetration testing, and security posture monitoring. Required skills: Cybersecurity, Linux, Python, Cryptography, Networking.",
                 required_skills=["cybersecurity", "linux", "python", "cryptography", "git"],
+                preferred_certifications=["CompTIA Security+"],
                 cluster_id=6,
-                external_url="https://www.google.com/search?q=cybersecurity+jobs"
+                external_url="https://www.google.com/search?q=cybersecurity+jobs",
+                salary_min=90000, salary_max=145000
             ),
             models.Job(
                 title="Frontend React & UI Engineer",
                 company="Lumina Creative Tech",
                 description="Craft fluid, accessible web applications and design system components. Required skills: React, Next.js, JavaScript, TypeScript, Tailwind, CSS, HTML.",
                 required_skills=["react", "javascript", "typescript", "css", "html", "git"],
+                preferred_certifications=["Meta Front-End Developer Certificate"],
                 cluster_id=7,
-                external_url="https://www.linkedin.com/jobs"
+                external_url="https://www.linkedin.com/jobs",
+                salary_min=85000, salary_max=135000
             ),
             models.Job(
                 title="Technical Product Manager",
                 company="Velocity AI Products",
                 description="Drive product roadmap, agile sprints, and data-informed feature development. Required skills: Project Management, Agile, SQL, Communication, Leadership.",
                 required_skills=["project management", "agile", "sql", "communication", "leadership"],
+                preferred_certifications=["PMI-ACP", "Professional Scrum Master I"],
                 cluster_id=8,
-                external_url="https://www.indeed.com/jobs"
+                external_url="https://www.indeed.com/jobs",
+                salary_min=100000, salary_max=160000
             )
         ]
         db.add_all(seed_jobs)
@@ -112,11 +129,15 @@ def _gather_and_rank_jobs(user_skills: list[str], limit: int, db: Session) -> di
             "location": "Remote / Onsite",
             "remote_status": "Remote",
             "employment_type": "Full-Time",
-            "salary": "$115,000 - $155,000 / yr",
+            "salary": (
+                f"${j.salary_min:,} - ${j.salary_max:,} / {j.salary_period}"
+                if j.salary_min and j.salary_max else "Salary not disclosed"
+            ),
             "description": j.description or f"{j.title} role working with modern engineering stack.",
             "apply_url": j.external_url or "#",
             "source": "Database",
             "required_skills": skills or ["python", "sql", "git"]
+            ,"preferred_certifications": j.preferred_certifications or []
         })
 
     # 3. Fetch Live Jobs from Remotive & Adzuna
@@ -199,6 +220,7 @@ def _gather_and_rank_jobs(user_skills: list[str], limit: int, db: Session) -> di
 @router.post("/recommend-jobs")
 def post_job_recommendations(
     request: RecommendJobsRequest,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -207,8 +229,7 @@ def post_job_recommendations(
     """
     user_skills = request.user_skills
     if not user_skills:
-        # Fallback to skills in DB
-        db_skills = db.query(models.UserSkill).all()
+        db_skills = db.query(models.UserSkill).filter_by(user_id=current_user.id).all()
         user_skills = [s.skill_name for s in db_skills] if db_skills else ["python", "sql", "git"]
 
     return _gather_and_rank_jobs(user_skills, request.limit, db)
@@ -218,8 +239,11 @@ def post_job_recommendations(
 def post_job_recommendations_for_user(
     user_id: int,
     request: RecommendJobsRequest,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendations not found")
     user_skills = request.user_skills
     if not user_skills:
         user_skills_db = db.query(models.UserSkill).filter_by(user_id=user_id).all()
@@ -231,8 +255,11 @@ def post_job_recommendations_for_user(
 @router.get("/recommend-jobs/{user_id}")
 def get_job_recommendations_by_id(
     user_id: int,
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    if user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendations not found")
     user_skills_db = db.query(models.UserSkill).filter_by(user_id=user_id).all()
     user_skills = [s.skill_name for s in user_skills_db] if user_skills_db else ["python", "sql", "git"]
     return _gather_and_rank_jobs(user_skills, 50, db)
@@ -240,8 +267,9 @@ def get_job_recommendations_by_id(
 
 @router.get("/recommend-jobs")
 def get_job_recommendations_generic(
+    current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    db_skills = db.query(models.UserSkill).all()
+    db_skills = db.query(models.UserSkill).filter_by(user_id=current_user.id).all()
     user_skills = [s.skill_name for s in db_skills] if db_skills else ["python", "sql", "git"]
     return _gather_and_rank_jobs(user_skills, 50, db)

@@ -1,8 +1,12 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, Text
 from sqlalchemy.orm import declarative_base, relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class User(Base):
     __tablename__ = 'users'
@@ -12,12 +16,15 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     current_role = Column(String(100))
     target_role = Column(String(100))  # Career Shift Supported
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     # Relationships
     skills = relationship("UserSkill", back_populates="user", cascade="all, delete-orphan")
     progress = relationship("UserProgress", back_populates="user", cascade="all, delete-orphan")
     roadmaps = relationship("Roadmap", back_populates="user", cascade="all, delete-orphan")
+    certificates = relationship("Certificate", back_populates="user", cascade="all, delete-orphan")
+    resumes = relationship("ResumeDocument", back_populates="user", cascade="all, delete-orphan")
+    applications = relationship("JobApplication", back_populates="user", cascade="all, delete-orphan")
 
 class UserSkill(Base):
     """ Captured from NLP Engine processing User Resume (Module 2) """
@@ -37,10 +44,71 @@ class Job(Base):
     company = Column(String(150))
     description = Column(Text)
     required_skills = Column(JSON) 
+    preferred_certifications = Column(JSON, default=list)
     cluster_id = Column(Integer)   
     external_url = Column(String(255))
     posted_date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    salary_min = Column(Integer, nullable=True)
+    salary_max = Column(Integer, nullable=True)
+    salary_currency = Column(String(10), default="USD")
+    salary_period = Column(String(20), default="year")
+    created_at = Column(DateTime, default=utc_now)
+
+class Certificate(Base):
+    __tablename__ = "certificates"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name = Column(String(150), nullable=False)
+    issuer = Column(String(150), nullable=False)
+    issue_date = Column(String(20))
+    expiry_date = Column(String(20), nullable=True)
+    credential_id = Column(String(150), nullable=True)
+    credential_url = Column(String(500), nullable=True)
+    skills = Column(JSON, default=list)
+    created_at = Column(DateTime, default=utc_now)
+
+    user = relationship("User", back_populates="certificates")
+
+class ResumeDocument(Base):
+    __tablename__ = "resume_documents"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String(150), nullable=False, default="My Resume")
+    template = Column(String(50), nullable=False, default="modern")
+    content = Column(JSON, nullable=False, default=dict)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    created_at = Column(DateTime, default=utc_now)
+
+    user = relationship("User", back_populates="resumes")
+    versions = relationship("ResumeVersion", back_populates="resume", cascade="all, delete-orphan")
+
+class ResumeVersion(Base):
+    __tablename__ = "resume_versions"
+    id = Column(Integer, primary_key=True, index=True)
+    resume_id = Column(Integer, ForeignKey("resume_documents.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    label = Column(String(100), default="Saved version")
+    template = Column(String(50), nullable=False, default="modern")
+    content = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=utc_now)
+
+    resume = relationship("ResumeDocument", back_populates="versions")
+
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    external_job_id = Column(String(150), nullable=False)
+    title = Column(String(150), nullable=False)
+    company = Column(String(150), nullable=True)
+    apply_url = Column(String(500), nullable=True)
+    status = Column(String(30), default="saved")
+    notes = Column(Text, default="")
+    follow_up_date = Column(String(20), nullable=True)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    user = relationship("User", back_populates="applications")
 
 class Course(Base):
     """ Learning content repository for Gap Analysis (Module 9) """
@@ -59,7 +127,7 @@ class Roadmap(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     target_role = Column(String(100), nullable=False) # The career chosen
     phase = Column(Integer, default=1) # 1, 2, 3 (Foundation, Core, etc.)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     user = relationship("User", back_populates="roadmaps")
 
