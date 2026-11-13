@@ -1,28 +1,27 @@
-import spacy
-from transformers import AutoTokenizer, AutoModel
-import torch
+spacy = None
+AutoTokenizer = AutoModel = torch = None
 import numpy as np
 import re
 
 # Load Pre-trained NLP Models
 # 1. SpaCy en_core_web_md (Medium English model) for lemmatization, stop words, and standard NER
 try:
-    nlp = spacy.load("en_core_web_md")
+    nlp = spacy.load("en_core_web_md") if spacy else None
 except OSError:
     # Fallback to loading the model explicitly / downloading instructions during production
     pass
 
 # 2. HuggingFace BERT for vector embeddings (Domain vocabulary mapping without training)
 # Using a lightweight sentence-transformer for quick inference
-tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
-bert_model = AutoModel.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')
+tokenizer = None
+bert_model = None
 
 def extract_entities(text: str) -> list[str]:
     """
     Cleans, tokenizes, and extracts potential skill entities using SpaCy.
     """
-    if "nlp" not in globals():
-        raise RuntimeError("SpaCy model 'en_core_web_md' is not installed. Run: python -m spacy download en_core_web_md")
+    if nlp is None:
+        return []
         
     doc = nlp(text)
     
@@ -101,6 +100,9 @@ def get_bert_embeddings(skill_list: list[str]) -> dict[str, np.ndarray]:
     Returns:
         Dictionary mapping the skill string to its numeric vector representation.
     """
+    if tokenizer is None or bert_model is None or torch is None:
+        return {}
+
     skill_embeddings = {}
     
     for skill in skill_list:

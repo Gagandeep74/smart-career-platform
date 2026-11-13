@@ -4,6 +4,7 @@ sqlalchemy==2.0.23
 pydantic==2.10.6
 python-multipart==0.0.20
 email-validator
+requests
 psycopg[binary]
 pandas
 numpy
