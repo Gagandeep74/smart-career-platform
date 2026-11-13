@@ -1,5 +1,5 @@
 // Utility wrapper factoring Authentication across API routes
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 // Gets the current token from browser's local state natively
 function getAuthHeaders(): Record<string, string> {

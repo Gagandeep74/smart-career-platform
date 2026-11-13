@@ -57,8 +57,8 @@ export default function V2LoginPage() {
         localStorage.setItem('user_id', String(loginResponse.user_id));
         router.push('/upload');
       }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed from API.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reach the backend. Make sure the API is running on port 8000.');
     } finally {
       setIsLoading(false);
     }
