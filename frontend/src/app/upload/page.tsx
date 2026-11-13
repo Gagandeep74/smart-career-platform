@@ -53,6 +53,7 @@ export default function V2UploadPage() {
     try {
       const res = await CareerAPI.uploadResume(file);
       setResult(res);
+      setIsScanning(false);
       if (typeof window !== 'undefined') {
         localStorage.setItem('recent_skills', JSON.stringify(res.detected_skills));
         localStorage.setItem('skill_scores', JSON.stringify(res.skill_scores || {}));
