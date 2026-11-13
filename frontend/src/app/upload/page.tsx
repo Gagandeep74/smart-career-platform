@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, UploadCloud, FileText, Cpu, CheckCircle, ExternalLink } from 'lucide-react';
+import { ArrowLeft, UploadCloud, FileText, Cpu, CheckCircle, ExternalLink, LayoutDashboard } from 'lucide-react';
 import { Tilt } from 'react-tilt';
 import { CareerAPI } from '@/lib/api';
 
@@ -97,7 +97,43 @@ export default function V2UploadPage() {
           </p>
         </motion.div>
 
-        {!isScanning ? (
+        {result ? (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full rounded-[2rem] border border-emerald-500/30 bg-slate-900/80 p-6 text-left backdrop-blur-xl"
+          >
+            <div className="flex items-center gap-3">
+              <CheckCircle className="h-8 w-8 text-emerald-400" />
+              <div>
+                <h2 className="text-xl font-black text-white">Resume analysis complete</h2>
+                <p className="text-sm text-slate-400">Review the extracted information in Resume Studio before saving.</p>
+              </div>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Detected skills</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {result.detected_skills.map((skill) => <span key={skill} className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-blue-200">{skill}</span>)}
+                </div>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Structured sections</p>
+                <p className="mt-3 text-sm text-slate-300">
+                  {Object.entries(result.structured_content || {}).filter(([, value]) => Array.isArray(value) ? value.length : Boolean(value)).map(([key]) => key).join(', ') || 'Skills and profile data'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button onClick={importToStudio} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500">
+                Import to Resume Studio <ExternalLink className="h-4 w-4" />
+              </button>
+              <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 rounded-xl border border-blue-400/30 px-5 py-3 font-bold text-blue-100 hover:bg-blue-400/10">
+                Open Dashboard <LayoutDashboard className="h-4 w-4" />
+              </button>
+            </div>
+          </motion.div>
+        ) : !isScanning ? (
           <Tilt options={defaultOptions} className="w-full">
             <div 
               onDragOver={(e) => { e.preventDefault(); setIsHovering(true); }}
@@ -129,37 +165,6 @@ export default function V2UploadPage() {
                       className="mt-6 px-8 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm uppercase tracking-widest shadow-[0_0_30px_-5px_rgba(16,185,129,0.6)] transition-all"
                     >
                       Initiate Scan
-                    </button>
-                  </motion.div>
-                ) : result ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="w-full rounded-[2rem] border border-emerald-500/30 bg-slate-900/80 p-6 text-left backdrop-blur-xl"
-                  >
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-8 w-8 text-emerald-400" />
-                      <div>
-                        <h2 className="text-xl font-black text-white">Resume analysis complete</h2>
-                        <p className="text-sm text-slate-400">Review the extracted information in Resume Studio before saving.</p>
-                      </div>
-                    </div>
-                    <div className="mt-6 grid gap-4 md:grid-cols-2">
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Detected skills</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {result.detected_skills.map((skill) => <span key={skill} className="rounded-full bg-blue-500/15 px-3 py-1 text-xs text-blue-200">{skill}</span>)}
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                        <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Structured sections</p>
-                        <p className="mt-3 text-sm text-slate-300">
-                          {Object.entries(result.structured_content || {}).filter(([, value]) => Array.isArray(value) ? value.length : Boolean(value)).map(([key]) => key).join(', ') || 'Skills and profile data'}
-                        </p>
-                      </div>
-                    </div>
-                    <button onClick={importToStudio} className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500">
-                      Import to Resume Studio <ExternalLink className="h-4 w-4" />
                     </button>
                   </motion.div>
                 ) : (
