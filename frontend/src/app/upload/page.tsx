@@ -59,6 +59,7 @@ export default function V2UploadPage() {
         localStorage.setItem('skill_scores', JSON.stringify(res.skill_scores || {}));
         localStorage.setItem('resume_import_draft', JSON.stringify(res.structured_content || {}));
       }
+      router.push('/dashboard');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Resume analysis failed');
       setIsScanning(false);
@@ -126,7 +127,7 @@ export default function V2UploadPage() {
             </div>
             <div className="mt-6 flex flex-wrap gap-3">
               <button onClick={importToStudio} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white hover:bg-emerald-500">
-                Import to Resume Studio <ExternalLink className="h-4 w-4" />
+                Open Resume Maker <ExternalLink className="h-4 w-4" />
               </button>
               <button onClick={() => router.push('/dashboard')} className="inline-flex items-center gap-2 rounded-xl border border-blue-400/30 px-5 py-3 font-bold text-blue-100 hover:bg-blue-400/10">
                 Open Dashboard <LayoutDashboard className="h-4 w-4" />

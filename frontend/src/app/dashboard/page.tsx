@@ -12,7 +12,7 @@ import {
   ArrowLeft, Target, Briefcase, Zap, Cpu, CheckCircle, Activity, Blocks, 
   ChevronUp, ChevronDown, ExternalLink, RefreshCw, User, LogOut, Home, 
   Search, Sparkles, Compass, AlertCircle, Flame, Building2, MapPin, 
-  DollarSign, CheckCircle2, XCircle, X, Loader2, BookOpen, Layers, TrendingUp
+  DollarSign, CheckCircle2, XCircle, X, Loader2, BookOpen, Layers, TrendingUp, FilePenLine
 } from 'lucide-react';
 import { CareerAPI } from '@/lib/api';
 
@@ -363,6 +363,9 @@ export default function V2DashboardPage() {
           <Link href="/upload" className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all font-bold text-xs text-indigo-400 uppercase tracking-widest whitespace-nowrap">
             <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">New Scan</span>
           </Link>
+          <Link href="/resume-builder" className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all font-bold text-xs text-emerald-400 uppercase tracking-widest whitespace-nowrap">
+            <FilePenLine className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Resume Maker</span>
+          </Link>
           
           <div className="flex items-center gap-3 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900/50 rounded-full border border-white/10 shadow-sm">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
@@ -495,6 +498,12 @@ export default function V2DashboardPage() {
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] flex items-center gap-2 whitespace-nowrap self-start sm:self-auto"
               >
                 <Sparkles className="w-4 h-4" /> Open AI Job Recommendations →
+              </Link>
+              <Link
+                href="/resume-builder"
+                className="px-5 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap self-start sm:self-auto"
+              >
+                <FilePenLine className="w-4 h-4" /> Create Resume
               </Link>
             </div>
             
