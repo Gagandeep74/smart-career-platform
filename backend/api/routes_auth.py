@@ -37,8 +37,8 @@ class UserProfileResult(BaseModel):
     id: int
     name: str
     email: str
-    current_role: str
-    target_role: str
+    current_role: str | None = ""
+    target_role: str | None = ""
 
 # --- CORE LOGIC --- #
 def verify_password(plain_password: str, hashed_password: str) -> bool:

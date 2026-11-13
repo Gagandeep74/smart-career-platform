@@ -68,9 +68,19 @@ export const CareerAPI = {
   },
 
   // --- RECOMMENDATION MODULES --- //
-  async getJobRecommendations(userId: number) {
-    const response = await fetch(`${API_BASE_URL}/recommend-jobs/${userId}`, { headers: getAuthHeaders() });
-    if (!response.ok) throw new Error('Authorization required for ML Match');
+  async getJobRecommendations(userSkills: string[] = [], userId: number = 1) {
+    const response = await fetch(`${API_BASE_URL}/recommend-jobs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ user_skills: userSkills, limit: 50 })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.detail || 'Job recommendations routing failed.');
+    }
     return response.json();
   },
 
@@ -80,17 +90,20 @@ export const CareerAPI = {
     return response.json();
   },
 
-  async pivotCareer(targetRole: string) {
+  async pivotCareer(targetRole: string, userSkills: string[] = []) {
     const response = await fetch(`${API_BASE_URL}/roadmap/live-pivot`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ target_role: targetRole })
+      body: JSON.stringify({ target_role: targetRole, user_skills: userSkills })
     });
     
-    if (!response.ok) throw new Error('Live NLP scraper routing failed.');
+    if (!response.ok) {
+      const err = await response.json().catch(() => null);
+      throw new Error(err?.detail || 'Live NLP scraper routing failed.');
+    }
     return response.json();
   },
 

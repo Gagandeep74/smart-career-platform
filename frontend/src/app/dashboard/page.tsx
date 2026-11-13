@@ -8,12 +8,57 @@ import {
   BarElement, ArcElement, RadialLinearScale, Filler, Title, Tooltip, Legend 
 } from 'chart.js';
 import { Bar, Line, Radar, Doughnut } from 'react-chartjs-2';
-import { ArrowLeft, Target, Briefcase, Zap, Cpu, CheckCircle, Activity, Blocks, ChevronUp, ChevronDown, ExternalLink, RefreshCw, User, LogOut, Home } from 'lucide-react';
+import { 
+  ArrowLeft, Target, Briefcase, Zap, Cpu, CheckCircle, Activity, Blocks, 
+  ChevronUp, ChevronDown, ExternalLink, RefreshCw, User, LogOut, Home, 
+  Search, Sparkles, Compass, AlertCircle, Flame, Building2, MapPin, 
+  DollarSign, CheckCircle2, XCircle, X, Loader2, BookOpen, Layers, TrendingUp
+} from 'lucide-react';
+import { CareerAPI } from '@/lib/api';
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement, 
   BarElement, ArcElement, RadialLinearScale, Filler, Title, Tooltip, Legend
 );
+
+interface UserProfile {
+  id: number;
+  name: string;
+  email: string;
+  current_role?: string | null;
+  target_role?: string | null;
+}
+
+interface LiveJob {
+  title: string;
+  company: string;
+  location: string;
+  apply_url?: string;
+  salary?: string;
+  company_logo?: string;
+  job_type?: string;
+  description?: string;
+  match_percentage: number;
+  matched_skills: string[];
+  missing_skills: string[];
+  required_skills: string[];
+  platform_links?: Record<string, string>;
+  roadmap_phases?: {
+    skill: string;
+    title: string;
+    difficulty: string;
+    url: string;
+    content_type: string;
+  }[];
+}
+
+interface PivotResultData {
+  target_role: string;
+  user_skills: string[];
+  scraped_jobs_count: number;
+  recommended_jobs: LiveJob[];
+  suggestions?: string[];
+}
 
 export default function V2DashboardPage() {
   const [extractedSkills, setExtractedSkills] = useState(['Python', 'Machine Learning', 'SQL', 'FastAPI']);
@@ -23,6 +68,7 @@ export default function V2DashboardPage() {
   const [expandedJob, setExpandedJob] = useState<number | null>(null);
   const [showAllPaths, setShowAllPaths] = useState(false);
   
+  const [skillScores, setSkillScores] = useState<Record<string, number>>({});
   const [futureGaps, setFutureGaps] = useState<{role: string, skills: string[]}[]>([
     { role: 'AI & Data Engineering', skills: ['PyTorch', 'TensorFlow'] },
     { role: 'Cloud & Infrastructure', skills: ['Docker', 'AWS'] }
@@ -30,7 +76,65 @@ export default function V2DashboardPage() {
   const [personalizedMsg, setPersonalizedMsg] = useState('We are analyzing your tech profile to determine the best bridging strategy for your career.');
 
   const [isLoading, setIsLoading] = useState(true);
-  const [userName, setUserName] = useState('Guest User');
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+
+  // --- Career Pivot Search State ---
+  const [pivotSearchQuery, setPivotSearchQuery] = useState('');
+  const [isPivotSearching, setIsPivotSearching] = useState(false);
+  const [pivotResults, setPivotResults] = useState<PivotResultData | null>(null);
+  const [pivotError, setPivotError] = useState<string | null>(null);
+  const [expandedPivotJob, setExpandedPivotJob] = useState<number | null>(0);
+  const [searchedRoleName, setSearchedRoleName] = useState<string>('');
+
+  const handleCareerPivotSearch = async (roleToSearch?: string) => {
+    const query = (roleToSearch ?? pivotSearchQuery).trim();
+    if (!query) {
+      setPivotError('Please enter a valid career title or job role to search.');
+      return;
+    }
+    
+    setPivotError(null);
+    setSearchedRoleName(query);
+    setIsPivotSearching(true);
+    setPivotSearchQuery(query);
+
+    // Check Session Cache
+    const cacheKey = `pivot_cache_${query.toLowerCase()}`;
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setPivotResults(parsed);
+          setIsPivotSearching(false);
+          return;
+        } catch (e) {}
+      }
+    }
+
+    try {
+      const res = await CareerAPI.pivotCareer(query, extractedSkills);
+      setPivotResults(res);
+      setPivotError(null);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(cacheKey, JSON.stringify(res));
+      }
+    } catch (err: any) {
+      console.error('Pivot search failed:', err);
+      setPivotError(err?.message || 'Failed to search live career opportunities. Please try again.');
+      setPivotResults(null);
+    } finally {
+      setIsPivotSearching(false);
+    }
+  };
+
+  const clearPivotSearch = () => {
+    setPivotSearchQuery('');
+    setPivotResults(null);
+    setPivotError(null);
+    setSearchedRoleName('');
+  };
 
   const executePivot = async (skills: string[]) => {
     if (!skills || skills.length === 0) {
@@ -81,11 +185,41 @@ export default function V2DashboardPage() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_name');
+    window.location.href = '/login';
+  };
+
   useEffect(() => {
     let initialSkills = extractedSkills;
     if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('userEmail');
-      if (savedUser) setUserName(savedUser.split('@')[0]);
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        window.location.href = '/login';
+        return;
+      }
+
+      // Fetch Real Authenticated User Profile from GET /api/v1/auth/me
+      CareerAPI.getProfile()
+        .then((profile) => {
+          if (profile && profile.name) {
+            setUserProfile(profile);
+          }
+        })
+        .catch((err) => {
+          console.error('Session expired or unauthorized:', err);
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('userEmail');
+          localStorage.removeItem('user_id');
+          localStorage.removeItem('user_name');
+          window.location.href = '/login';
+        })
+        .finally(() => {
+          setIsProfileLoading(false);
+        });
 
       const saved = localStorage.getItem('recent_skills');
       if (saved) {
@@ -93,6 +227,16 @@ export default function V2DashboardPage() {
           const parsed = JSON.parse(saved);
           if (parsed.length > 0) initialSkills = parsed;
         } catch(e) {}
+      }
+
+      const savedScores = localStorage.getItem('skill_scores');
+      if (savedScores) {
+        try {
+          const parsedScores = JSON.parse(savedScores);
+          if (parsedScores && typeof parsedScores === 'object' && Object.keys(parsedScores).length > 0) {
+            setSkillScores(parsedScores);
+          }
+        } catch (e) {}
       }
     }
     executePivot(initialSkills);
@@ -129,17 +273,34 @@ export default function V2DashboardPage() {
   };
   const radarOptions = { ...chartOptions, scales: { r: { angleLines: { color: 'rgba(255,255,255,0.1)' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: '#94a3b8' }, ticks: { display: false } } } };
 
-  // 2. Bar Chart (Historical Tool Usage vs Peers)
+  // 2. Bar Chart (Dynamic Skill Proficiency & Mastery)
+  const sortedSkillEntries = Object.entries(skillScores).sort(([, a], [, b]) => b - a);
+  const topSkillEntries = sortedSkillEntries.slice(0, 4);
+  const barLabels = topSkillEntries.map(([skill]) => skill.charAt(0).toUpperCase() + skill.slice(1));
+  const barValues = topSkillEntries.map(([, score]) => score);
+  const hasSkillScores = topSkillEntries.length > 0;
+
   const barData = {
-    labels: extractedSkills.slice(0, 4),
+    labels: barLabels,
     datasets: [{
-      label: 'Your Mastery Focus',
-      data: [95, 75, 80, 60],
+      label: 'Your Mastery Focus (%)',
+      data: barValues,
       backgroundColor: 'rgba(16, 185, 129, 0.8)',
       borderRadius: 6
     }]
   };
-  const barOptions = { ...chartOptions, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } } };
+  const barOptions = { 
+    ...chartOptions, 
+    scales: { 
+      x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, 
+      y: { 
+        grid: { color: 'rgba(255,255,255,0.05)' }, 
+        ticks: { color: '#94a3b8' },
+        min: 0,
+        max: 100
+      } 
+    } 
+  };
 
   // 3. Line Chart (Future Growth)
   const lineData = {
@@ -153,6 +314,7 @@ export default function V2DashboardPage() {
       { label: 'On-Premise SysAdmin', data: [100, 90, 75, 55, 45], borderColor: '#f97316', borderDash: [5, 5], tension: 0.4 }
     ]
   };
+  const lineOptions = { ...chartOptions, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } } } };
 
   // 4. Doughnut Chart (Gap Analysis Volumes)
   const doughnutData = {
@@ -195,17 +357,27 @@ export default function V2DashboardPage() {
             <Home className="w-4 h-4" /> <span className="hidden sm:inline">Home</span>
           </Link>
 
-          <Link href="/upload" className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all font-bold text-xs text-indigo-400 uppercase tracking-widest whitespace-nowrap">
+          <Link href="/job-recommendations" className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 transition-all font-bold text-xs text-blue-400 uppercase tracking-widest whitespace-nowrap shadow-sm">
+            <Sparkles className="w-3.5 h-3.5" /> <span className="hidden md:inline">AI Job Recs</span>
+          </Link>
+          <Link href="/upload" className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 transition-all font-bold text-xs text-indigo-400 uppercase tracking-widest whitespace-nowrap">
             <RefreshCw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">New Scan</span>
           </Link>
           
-          <div className="flex items-center gap-3 px-2 sm:px-4 py-1.5 sm:py-2 bg-slate-900/50 rounded-full border border-white/10 shadow-sm">
+          <div className="flex items-center gap-3 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900/50 rounded-full border border-white/10 shadow-sm">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-400" />
             </div>
-            <span className="text-xs sm:text-sm font-bold text-white capitalize hidden sm:block max-w-[120px] truncate">{userName}</span>
+            <div className="hidden sm:flex flex-col text-left">
+              <span className="text-xs sm:text-sm font-bold text-white max-w-[130px] truncate">
+                {userProfile?.name || (isProfileLoading ? 'Loading...' : 'User')}
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono max-w-[130px] truncate">
+                {userProfile?.email}
+              </span>
+            </div>
             <div className="w-px h-4 bg-white/20 mx-1 lg:mx-2 hidden sm:block" />
-            <button onClick={() => { localStorage.removeItem('userEmail'); localStorage.removeItem('access_token'); localStorage.removeItem('user_id'); window.location.href='/login'; }} className="text-slate-400 hover:text-rose-400 transition-colors hidden sm:block" title="Logout">
+            <button onClick={handleLogout} className="text-slate-400 hover:text-rose-400 transition-colors hidden sm:block cursor-pointer" title="Logout">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -220,6 +392,34 @@ export default function V2DashboardPage() {
       ) : (
         <motion.div variants={containerVariants} initial="hidden" animate="show" className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-6 max-w-[1400px] mx-auto">
           
+          {/* Authenticated User Profile Summary Card */}
+          {userProfile && (
+            <motion.div variants={itemVariants} className="col-span-1 md:col-span-12 flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5 rounded-2xl bg-white/[0.02] border border-white/10 backdrop-blur-md">
+              <div className="flex flex-wrap items-center gap-4 sm:gap-8 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 uppercase tracking-widest font-mono text-[10px]">Name:</span>
+                  <span className="font-bold text-white text-sm">{userProfile.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 uppercase tracking-widest font-mono text-[10px]">Email:</span>
+                  <span className="font-medium text-slate-300">{userProfile.email}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 uppercase tracking-widest font-mono text-[10px]">Current Role:</span>
+                  <span className="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded border border-blue-500/20">
+                    {userProfile.current_role && userProfile.current_role.trim() ? userProfile.current_role : 'Not Set'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 uppercase tracking-widest font-mono text-[10px]">Target Role:</span>
+                  <span className="font-bold text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded border border-indigo-500/20">
+                    {userProfile.target_role && userProfile.target_role.trim() ? userProfile.target_role : 'Not Set'}
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Top Row Highlights */}
           <motion.div variants={itemVariants} className="col-span-1 md:col-span-12 bg-blue-600/10 border border-blue-500/20 rounded-3xl p-8 lg:p-10 backdrop-blur-md flex flex-col lg:flex-row gap-8 items-center justify-between">
             <div className="flex-1">
@@ -249,32 +449,53 @@ export default function V2DashboardPage() {
           </motion.div>
 
           {/* Graph Section 1: Radar */}
-          <motion.div variants={itemVariants} className="col-span-1 md:col-span-4 bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-md">
+          <motion.div variants={itemVariants} className="col-span-1 md:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-md">
             <h3 className="text-white font-bold mb-6 flex items-center gap-2">
               <Target className="w-4 h-4 text-blue-500" /> Career Role Alignment
             </h3>
             <div className="h-64"><Radar data={radarData} options={radarOptions} /></div>
           </motion.div>
 
-          {/* Alternative Career Matches (Formerly K-Means) */}
-          <motion.div variants={itemVariants} className="col-span-1 md:col-span-8 bg-white/[0.02] border border-white/10 rounded-3xl p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden">
+          {/* Graph Section 2: Dynamic Skill Mastery Bar Chart */}
+          <motion.div variants={itemVariants} className="col-span-1 md:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-md flex flex-col justify-between">
+            <h3 className="text-white font-bold mb-6 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-emerald-500" /> Skill Proficiency Breakdown
+            </h3>
+            <div className="h-64">
+              {hasSkillScores ? (
+                <Bar data={barData} options={barOptions} />
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center border border-dashed border-white/10 rounded-2xl p-6 text-center">
+                  <Activity className="w-8 h-8 text-slate-600 mb-2" />
+                  <p className="text-sm font-semibold text-slate-400">No Skill Scores Available</p>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xs">Upload your resume to generate dynamic skill proficiency scores.</p>
+                  <Link href="/upload" className="mt-3 px-3 py-1.5 rounded-full bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest transition-colors">
+                    Upload Resume
+                  </Link>
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          {/* Top Career Matches (Career Path Analyzer - Curated 8 Paths) */}
+          <motion.div variants={itemVariants} className="col-span-1 md:col-span-12 bg-white/[0.02] border border-white/10 rounded-3xl p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 relative z-10 w-full">
               <div>
                 <h2 className="text-indigo-400 font-bold uppercase tracking-widest text-xs flex items-center gap-2 mb-1">
-                  <Activity className="w-4 h-4" /> Alternative Career Matches
+                  <Activity className="w-4 h-4" /> Top Career Matches
                 </h2>
                 <p className="text-sm text-slate-400">
-                  Secondary pathways your skill sequence strongly aligns with based on our market analysis.
+                  Curated core career pathways your skill sequence aligns with based on our baseline path analyzer.
                 </p>
               </div>
-              <button 
-                onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} 
-                className="px-4 py-2.5 rounded-lg border border-indigo-500/20 bg-indigo-500/5 hover:bg-indigo-500/10 text-indigo-400 text-xs font-bold uppercase tracking-widest transition-colors shadow-sm whitespace-nowrap hidden sm:block"
+              <Link 
+                href="/job-recommendations" 
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold uppercase tracking-widest transition-all shadow-[0_0_20px_rgba(59,130,246,0.3)] flex items-center gap-2 whitespace-nowrap self-start sm:self-auto"
               >
-                Analyze All
-              </button>
+                <Sparkles className="w-4 h-4" /> Open AI Job Recommendations →
+              </Link>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1 w-full relative z-10">
@@ -308,6 +529,576 @@ export default function V2DashboardPage() {
             </div>
           </motion.div>
 
+          {/* ========================================================================= */}
+          {/* SECTION: CAREER PIVOT SEARCH */}
+          {/* ========================================================================= */}
+          <motion.div variants={itemVariants} className="col-span-1 md:col-span-12 mt-4 bg-slate-900/50 border border-blue-500/20 sm:rounded-[2.5rem] p-6 lg:p-10 flex flex-col gap-8 relative overflow-hidden backdrop-blur-md shadow-2xl">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-blue-500/60 to-transparent opacity-70" />
+            <div className="absolute -right-12 -top-12 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                  <Compass className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                    Career Pivot Search
+                  </h2>
+                  <p className="text-slate-400 text-sm font-medium mt-1">
+                    Explore live job opportunities, real-time competency gap analysis, and tailored roadmaps for <span className="text-blue-400 font-bold">ANY</span> target role.
+                  </p>
+                </div>
+              </div>
+
+              {pivotResults && (
+                <button
+                  onClick={clearPivotSearch}
+                  className="self-start md:self-auto px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-xs font-bold text-slate-300 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" /> Reset Search
+                </button>
+              )}
+            </div>
+
+            {/* Search Input Bar & Quick Suggestions */}
+            <div className="flex flex-col gap-4 relative z-10">
+              <form 
+                onSubmit={(e) => { e.preventDefault(); handleCareerPivotSearch(); }}
+                className="flex flex-col sm:flex-row gap-3 w-full"
+              >
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={pivotSearchQuery}
+                    onChange={(e) => { setPivotSearchQuery(e.target.value); if (pivotError) setPivotError(null); }}
+                    placeholder="Enter any target role (e.g., AI Engineer, Prompt Engineer, Rust Developer, Product Manager, Quantum Software Engineer)..."
+                    className="w-full pl-12 pr-10 py-4 bg-slate-950/80 border border-blue-500/20 focus:border-blue-500 rounded-2xl text-white placeholder-slate-500 text-sm md:text-base outline-none transition-all shadow-inner focus:shadow-[0_0_20px_rgba(59,130,246,0.2)]"
+                  />
+                  {pivotSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setPivotSearchQuery('')}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                      title="Clear"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={isPivotSearching}
+                  className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest rounded-2xl transition-all flex items-center justify-center gap-2 shadow-[0_0_25px_rgba(59,130,246,0.4)] cursor-pointer whitespace-nowrap"
+                >
+                  {isPivotSearching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Scanning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>Pivot Search</span>
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Quick Role Suggestions */}
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mr-1">Trending Roles:</span>
+                {[
+                  'AI Engineer', 
+                  'Data Engineer', 
+                  'Prompt Engineer', 
+                  'Backend Developer', 
+                  'Product Manager', 
+                  'Cybersecurity Analyst', 
+                  'Full Stack Developer', 
+                  'Quantum Software Engineer'
+                ].map((role) => (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => handleCareerPivotSearch(role)}
+                    disabled={isPivotSearching}
+                    className="px-3 py-1 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-300 text-xs font-semibold hover:border-blue-500/40 transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    {role}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ERROR STATE */}
+            {pivotError && (
+              <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3 text-rose-300 relative z-10">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">{pivotError}</p>
+                  <button 
+                    onClick={() => handleCareerPivotSearch()} 
+                    className="mt-2 text-xs font-bold text-rose-400 hover:text-rose-300 underline uppercase tracking-wider cursor-pointer"
+                  >
+                    Try again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* LOADING STATE */}
+            {isPivotSearching && (
+              <div className="p-12 rounded-3xl bg-slate-950/60 border border-blue-500/20 flex flex-col items-center justify-center text-center relative z-10">
+                <div className="relative mb-6">
+                  <div className="w-16 h-16 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin" />
+                  <Compass className="w-7 h-7 text-blue-400 absolute inset-0 m-auto animate-pulse" />
+                </div>
+                <h3 className="text-lg font-black text-white tracking-tight mb-2">
+                  Scanning Live Career Nodes for &quot;{searchedRoleName}&quot;
+                </h3>
+                <p className="text-xs text-slate-400 font-mono max-w-md uppercase tracking-widest leading-relaxed">
+                  Querying live job index • Extracting NLP competencies • Computing skill overlap • Synthesizing roadmap phases...
+                </p>
+              </div>
+            )}
+
+            {/* EMPTY / NO JOBS FOUND STATE */}
+            {!isPivotSearching && pivotResults && pivotResults.recommended_jobs.length === 0 && (
+              <div className="p-10 rounded-3xl bg-slate-950/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center relative z-10">
+                <AlertCircle className="w-10 h-10 text-amber-400 mb-3" />
+                <h3 className="text-lg font-bold text-white mb-1">No matching jobs found for &quot;{searchedRoleName}&quot;</h3>
+                <p className="text-xs text-slate-400 max-w-md leading-relaxed mb-6">
+                  We could not find active job listings directly matching this title right now. Try searching one of the related career suggestions below:
+                </p>
+                {pivotResults.suggestions && pivotResults.suggestions.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {pivotResults.suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => handleCareerPivotSearch(suggestion)}
+                        className="px-4 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                      >
+                        Pivot to {suggestion} →
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* RESULTS CONTAINER */}
+            {!isPivotSearching && pivotResults && pivotResults.recommended_jobs.length > 0 && (() => {
+              const jobs = pivotResults.recommended_jobs;
+              const avgMatch = Math.round(jobs.reduce((acc, curr) => acc + (curr.match_percentage || 0), 0) / (jobs.length || 1));
+              
+              // Aggregate all unique missing skills and count frequency
+              const missingSkillCounts: Record<string, number> = {};
+              const matchedSkillSet = new Set<string>();
+              jobs.forEach(job => {
+                (job.missing_skills || []).forEach(s => {
+                  const k = s.toLowerCase();
+                  missingSkillCounts[k] = (missingSkillCounts[k] || 0) + 1;
+                });
+                (job.matched_skills || []).forEach(s => matchedSkillSet.add(s.toLowerCase()));
+              });
+              
+              const sortedMissing = Object.entries(missingSkillCounts).sort(([, a], [, b]) => b - a);
+              const topJob = jobs[0];
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 relative z-10 w-full">
+                  
+                  {/* CARD 1: Career Overview */}
+                  <div className="col-span-1 md:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 lg:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute -top-6 -right-6 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400 font-bold bg-blue-500/10 px-2.5 py-1 rounded border border-blue-500/20">
+                          Target Trajectory
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
+                          {jobs.length} Postings Scraped
+                        </span>
+                      </div>
+                      <h3 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-3">
+                        {pivotResults.target_role}
+                      </h3>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Transitioning into <span className="text-white font-bold">{pivotResults.target_role}</span> leverages{' '}
+                        <span className="text-emerald-400 font-bold">{matchedSkillSet.size} of your current skills</span> with an estimated{' '}
+                        <span className="text-blue-400 font-bold">{avgMatch}% market alignment</span> across active job nodes.
+                      </p>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-white/5 flex flex-col gap-3">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-400 uppercase tracking-wider">Overall Match Score</span>
+                        <span className={`font-black text-lg ${
+                          avgMatch >= 70 ? 'text-emerald-400' : avgMatch >= 45 ? 'text-amber-400' : 'text-rose-400'
+                        }`}>
+                          {avgMatch}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-700 ${
+                            avgMatch >= 70 ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 
+                            avgMatch >= 45 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 
+                            'bg-gradient-to-r from-rose-500 to-pink-500'
+                          }`}
+                          style={{ width: `${avgMatch}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">
+                        {avgMatch >= 70 ? '✓ High Direct Compatibility' : avgMatch >= 45 ? '⚡ Accelerated Upskilling Feasible' : '📚 Substantial Skill Bridge Required'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CARD 2: Missing Skills & Priority Chips */}
+                  <div className="col-span-1 md:col-span-6 bg-white/[0.02] border border-white/10 rounded-3xl p-6 lg:p-8 backdrop-blur-md flex flex-col justify-between relative overflow-hidden">
+                    <div className="absolute -top-6 -right-6 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-purple-400 uppercase tracking-widest flex items-center gap-1.5">
+                          <Target className="w-4 h-4" /> Competency Gap Matrix
+                        </h4>
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
+                          {sortedMissing.length} Total Gaps
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3 mt-2">
+                        {/* High Priority Skills */}
+                        <div>
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest flex items-center gap-1 mb-2">
+                            <Flame className="w-3 h-3 text-rose-500" /> High-Priority Missing Skills:
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {sortedMissing.slice(0, 5).map(([skill, count]) => (
+                              <span 
+                                key={skill} 
+                                className="px-2.5 py-1 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold uppercase tracking-wider rounded-lg flex items-center gap-1 shadow-sm"
+                              >
+                                {skill}
+                                <span className="text-[9px] px-1 py-0.2 bg-rose-500/20 rounded font-mono text-rose-400">
+                                  {count}x
+                                </span>
+                              </span>
+                            ))}
+                            {sortedMissing.length === 0 && (
+                              <span className="text-xs text-emerald-400 font-bold">✓ No Missing Skills Detected!</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Secondary Skills */}
+                        {sortedMissing.length > 5 && (
+                          <div className="pt-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                              Secondary Missing Skills:
+                            </span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {sortedMissing.slice(5, 12).map(([skill]) => (
+                                <span 
+                                  key={skill} 
+                                  className="px-2 py-0.5 bg-purple-500/10 border border-purple-500/20 text-purple-300 text-[11px] font-semibold uppercase tracking-wider rounded-md"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Matched Skills Bar */}
+                    <div className="mt-5 pt-4 border-t border-white/5">
+                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1 mb-2">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Currently Possessed Overlapping Skills:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Array.from(matchedSkillSet).map(s => (
+                          <span key={s} className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-widest rounded">
+                            ✓ {s}
+                          </span>
+                        ))}
+                        {matchedSkillSet.size === 0 && (
+                          <span className="text-xs text-slate-500 italic font-mono">None from uploaded profile</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CARD 3: Personalized Learning Roadmap */}
+                  {topJob && topJob.roadmap_phases && topJob.roadmap_phases.length > 0 && (
+                    <div className="col-span-1 md:col-span-12 bg-white/[0.02] border border-white/10 rounded-3xl p-6 lg:p-8 backdrop-blur-md relative overflow-hidden">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                            <BookOpen className="w-5 h-5 text-blue-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-lg font-bold text-white">
+                              Personalized Transition Roadmap for {pivotResults.target_role}
+                            </h4>
+                            <p className="text-xs text-slate-400">
+                              Curated step-by-step curriculum to systematically eliminate your competency gaps.
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 px-3 py-1 rounded-full">
+                          {topJob.roadmap_phases.length} Learning Steps
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {topJob.roadmap_phases.map((phase, i) => {
+                          const isCapstone = phase.skill === 'Capstone';
+                          return (
+                            <div 
+                              key={i} 
+                              className={`p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3 ${
+                                isCapstone 
+                                  ? 'bg-amber-500/10 border-amber-500/30' 
+                                  : 'bg-slate-900/60 border-white/5 hover:border-blue-500/30'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <span className={`text-[10px] font-black uppercase tracking-widest ${
+                                    isCapstone ? 'text-amber-400' : 'text-blue-400'
+                                  }`}>
+                                    {isCapstone ? '🎯 FINAL CAPSTONE VERIFICATION' : `PHASE ${i + 1}: ${phase.skill.toUpperCase()}`}
+                                  </span>
+                                  <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider border ${
+                                    isCapstone 
+                                      ? 'bg-amber-500/20 border-amber-500/40 text-amber-300' 
+                                      : 'bg-blue-500/10 border-blue-500/20 text-blue-300'
+                                  }`}>
+                                    {phase.difficulty}
+                                  </span>
+                                </div>
+                                <h5 className={`text-sm font-bold leading-snug ${isCapstone ? 'text-amber-200' : 'text-white'}`}>
+                                  {phase.title}
+                                </h5>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest">
+                                  Type: {phase.content_type || 'Module'}
+                                </span>
+                                {phase.url && (
+                                  <a 
+                                    href={phase.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-3 py-1 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-xs font-bold uppercase tracking-widest rounded-lg transition-colors"
+                                  >
+                                    <ExternalLink className="w-3 h-3" /> Execute Module
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CARD 4: Live Job Opportunities */}
+                  <div className="col-span-1 md:col-span-12 flex flex-col gap-4">
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <h4 className="text-xl font-bold text-white flex items-center gap-2">
+                          <Briefcase className="w-5 h-5 text-indigo-400" /> Live Job Opportunities
+                        </h4>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Active employment postings analyzed with per-job competency mapping.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full uppercase tracking-widest">
+                        {jobs.length} Verified Nodes
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {jobs.map((job, idx) => (
+                        <div 
+                          key={idx}
+                          className={`bg-white/[0.02] border transition-all rounded-2xl backdrop-blur-md overflow-hidden ${
+                            expandedPivotJob === idx ? 'border-indigo-500/40 shadow-[0_0_20px_rgba(99,102,241,0.1)]' : 'border-white/10 hover:border-white/20'
+                          }`}
+                        >
+                          <div className="p-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                                    <Building2 className="w-3 h-3" /> {job.company || 'Tech Enterprise'}
+                                  </span>
+                                  <span className="text-xs font-semibold text-slate-400 bg-slate-900 border border-white/5 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-slate-500" /> {job.location || 'Remote'}
+                                  </span>
+                                  {job.job_type && (
+                                    <span className="text-xs font-semibold text-slate-400 bg-slate-900 border border-white/5 px-2.5 py-0.5 rounded-full">
+                                      {job.job_type}
+                                    </span>
+                                  )}
+                                  {job.salary && (
+                                    <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                      <DollarSign className="w-3 h-3" /> {job.salary}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <h5 className="text-xl font-bold text-white mb-2">{job.title}</h5>
+
+                                {job.description && (
+                                  <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">
+                                    {job.description.replace(/<[^>]*>?/gm, '')}
+                                  </p>
+                                )}
+
+                                {/* Platform External Links */}
+                                <div className="flex flex-wrap items-center gap-2 pt-2">
+                                  {job.apply_url && job.apply_url !== '#' && (
+                                    <a
+                                      href={job.apply_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
+                                    >
+                                      Direct Apply <ExternalLink className="w-3 h-3" />
+                                    </a>
+                                  )}
+                                  {job.platform_links && Object.entries(job.platform_links).map(([platform, url]) => (
+                                    <a
+                                      key={platform}
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 border border-white/10 hover:border-blue-500/30 text-slate-400 hover:text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1"
+                                    >
+                                      <ExternalLink className="w-2.5 h-2.5" /> {platform.replace('_', ' ')}
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Match Score Badge & Details Toggle */}
+                              <div className="flex items-center gap-4 self-end md:self-center">
+                                <div className={`p-3.5 rounded-xl border flex flex-col items-center justify-center min-w-[100px] ${
+                                  job.match_percentage >= 70 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' :
+                                  job.match_percentage >= 45 ? 'bg-amber-500/10 border-amber-500/30 text-amber-400' :
+                                  'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                }`}>
+                                  <span className="text-2xl font-black">{Math.round(job.match_percentage)}%</span>
+                                  <span className="text-[9px] uppercase font-bold tracking-widest mt-0.5 opacity-80">Match</span>
+                                </div>
+                                <button
+                                  onClick={() => setExpandedPivotJob(expandedPivotJob === idx ? null : idx)}
+                                  className="p-2 hover:bg-white/10 rounded-xl transition-colors border border-transparent hover:border-white/10 cursor-pointer text-slate-400 hover:text-white"
+                                  title="Toggle Details"
+                                >
+                                  {expandedPivotJob === idx ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Expanded Job Deep Dive */}
+                          {expandedPivotJob === idx && (
+                            <div className="border-t border-white/10 p-6 bg-slate-950/40 space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
+                                  <h6 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <CheckCircle className="w-3.5 h-3.5" /> Matched Skills ({job.matched_skills?.length || 0})
+                                  </h6>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {job.matched_skills?.length > 0 ? job.matched_skills.map(s => (
+                                      <span key={s} className="px-2 py-0.5 bg-emerald-500/10 text-emerald-300 text-[10px] font-bold uppercase tracking-wider rounded border border-emerald-500/20">{s}</span>
+                                    )) : <span className="text-xs text-slate-500 italic">None</span>}
+                                  </div>
+                                </div>
+
+                                <div className="p-4 bg-rose-500/5 rounded-xl border border-rose-500/20">
+                                  <h6 className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                    <Target className="w-3.5 h-3.5" /> Missing Skills for This Posting ({job.missing_skills?.length || 0})
+                                  </h6>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {job.missing_skills?.length > 0 ? job.missing_skills.map(s => (
+                                      <span key={s} className="px-2 py-0.5 bg-rose-500/10 text-rose-300 text-[10px] font-bold uppercase tracking-wider rounded border border-rose-500/20">{s}</span>
+                                    )) : <span className="text-xs text-emerald-400 font-bold">✓ 100% Skill Overlap</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CARD 5: Career Insights */}
+                  <div className="col-span-1 md:col-span-12 bg-white/[0.02] border border-white/10 rounded-3xl p-6 lg:p-8 backdrop-blur-md flex flex-col gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                        <TrendingUp className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-white">
+                          Strategic Career Insights for {pivotResults.target_role}
+                        </h4>
+                        <p className="text-xs text-slate-400">
+                          Synthesis of live industry demand patterns and optimization recommendations.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Postings Analyzed</span>
+                        <span className="text-2xl font-black text-white">{jobs.length}</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Avg Alignment</span>
+                        <span className="text-2xl font-black text-blue-400">{avgMatch}%</span>
+                      </div>
+                      <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Top Desired Skill</span>
+                        <span className="text-xl font-bold text-rose-400 truncate block">
+                          {sortedMissing[0]?.[0] ? sortedMissing[0][0].toUpperCase() : 'None'}
+                        </span>
+                      </div>
+                      <div className="bg-slate-900/60 p-4 rounded-2xl border border-white/5">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest block mb-1">Total Competencies</span>
+                        <span className="text-2xl font-black text-purple-400">
+                          {matchedSkillSet.size + sortedMissing.length}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-900/40 border border-white/5 p-4 rounded-2xl text-xs text-slate-300 leading-relaxed">
+                      💡 <span className="font-bold text-white">Optimization Strategy:</span> To maximize your hiring probability for{' '}
+                      <span className="text-blue-400 font-bold">{pivotResults.target_role}</span>, prioritize acquiring{' '}
+                      <span className="text-rose-400 font-bold">
+                        {sortedMissing.slice(0, 3).map(([s]) => s.toUpperCase()).join(', ')}
+                      </span>. Completing the recommended transition curriculum will elevate your market match score above 85%.
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })()}
+
+          </motion.div>
+
           {/* MASSIVE WRAPPER: Future Demand Skills */}
           <motion.div variants={itemVariants} className="col-span-1 md:col-span-12 mt-4 bg-slate-900/40 border-t border-indigo-500/20 sm:rounded-[2.5rem] p-6 lg:p-10 flex flex-col gap-8 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent opacity-50" />
@@ -329,7 +1120,7 @@ export default function V2DashboardPage() {
               {/* Line Chart */}
               <div className="col-span-1 md:col-span-12 bg-white/[0.02] border border-white/10 rounded-3xl p-6 backdrop-blur-md">
                 <h3 className="text-white font-bold mb-6 flex items-center gap-2"><Zap className="w-4 h-4 text-emerald-500" /> Estimated Market Growth</h3>
-                <div className="h-64"><Line data={lineData} options={barOptions} /></div>
+                <div className="h-64"><Line data={lineData} options={lineOptions} /></div>
               </div>
 
               {/* Dense Doughnut Chart Layout */}

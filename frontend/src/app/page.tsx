@@ -6,6 +6,7 @@ import { OrbitControls, Stars, Float, Sphere, MeshDistortMaterial } from '@react
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ArrowRight, Zap, Target, BrainCircuit, User, LogOut } from 'lucide-react';
+import { CareerAPI } from '@/lib/api';
 
 function InteractiveBrain() {
   const meshRef = useRef<any>(null);
@@ -37,14 +38,37 @@ function InteractiveBrain() {
 }
 
 export default function V2LandingPage() {
-  const [userName, setUserName] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedUser = localStorage.getItem('userEmail');
-      if (savedUser) setUserName(savedUser.split('@')[0]);
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        CareerAPI.getProfile()
+          .then((profile) => {
+            if (profile && profile.name) {
+              setUserProfile(profile);
+            }
+          })
+          .catch(() => {
+            // Token expired or invalid - clear stored auth data
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('userEmail');
+            localStorage.removeItem('user_id');
+            localStorage.removeItem('user_name');
+            setUserProfile(null);
+          });
+      }
     }
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_name');
+    setUserProfile(null);
+  };
 
   return (
     <div className="relative min-h-screen bg-slate-950 overflow-hidden text-slate-50 font-sans selection:bg-blue-500/30">
@@ -69,15 +93,15 @@ export default function V2LandingPage() {
           </span>
         </div>
         <div>
-          {userName ? (
+          {userProfile ? (
             <div className="flex items-center gap-3 px-4 py-2 bg-slate-900/50 rounded-full border border-white/10 shadow-sm backdrop-blur-md">
               <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
                 <User className="w-4 h-4 text-blue-400" />
               </div>
-              <span className="text-sm font-bold text-white capitalize">{userName}</span>
+              <span className="text-sm font-bold text-white">{userProfile.name}</span>
               <div className="w-px h-4 bg-white/20 mx-2" />
               <button 
-                onClick={() => { localStorage.removeItem('userEmail'); localStorage.removeItem('access_token'); localStorage.removeItem('user_id'); setUserName(null); }} 
+                onClick={handleLogout} 
                 className="text-slate-400 hover:text-rose-400 transition-colors cursor-pointer" 
                 title="Logout"
               >
@@ -130,11 +154,11 @@ export default function V2LandingPage() {
           transition={{ duration: 0.5, delay: 0.4 }}
           className="flex flex-col sm:flex-row gap-4"
         >
-          <Link href={userName ? "/upload" : "/login"} className="group flex items-center gap-2 px-8 py-4 rounded-full bg-blue-600 hover:bg-blue-500 transition-all font-bold shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)]">
+          <Link href={userProfile ? "/upload" : "/login"} className="group flex items-center gap-2 px-8 py-4 rounded-full bg-blue-600 hover:bg-blue-500 transition-all font-bold shadow-[0_0_40px_-10px_rgba(59,130,246,0.6)]">
             Scan My Resume
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
-          <Link href={userName ? "/dashboard" : "/login"} className="px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all font-bold backdrop-blur-md">
+          <Link href={userProfile ? "/dashboard" : "/login"} className="px-8 py-4 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 transition-all font-bold backdrop-blur-md">
             Go to Dashboard
           </Link>
         </motion.div>

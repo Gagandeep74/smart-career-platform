@@ -43,6 +43,7 @@ def generate_roadmap(user_id: int, job_id: int, db: Session = Depends(get_db)):
 
 class PivotRequest(BaseModel):
     target_role: str
+    user_skills: list[str] = []
 
 @router.post("/roadmap/live-pivot")
 def generate_live_pivot_roadmap(request: PivotRequest, current_user: models.User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -55,9 +56,11 @@ def generate_live_pivot_roadmap(request: PivotRequest, current_user: models.User
     - Suggests a learning roadmap for missing skills
     """
     
-    # 1. Fetch User Base Skills
-    user_skills_db = db.query(models.UserSkill).filter_by(user_id=current_user.id).all()
-    user_skills = [s.skill_name for s in user_skills_db]
+    # 1. Fetch User Base Skills (from request if provided, otherwise DB)
+    user_skills = request.user_skills
+    if not user_skills:
+        user_skills_db = db.query(models.UserSkill).filter_by(user_id=current_user.id).all()
+        user_skills = [s.skill_name for s in user_skills_db]
     
     # 2. Scrape Job API
     live_jobs = fetch_live_job_data(request.target_role)
@@ -73,14 +76,15 @@ def generate_live_pivot_roadmap(request: PivotRequest, current_user: models.User
     for job in live_jobs:
         # NLP extraction on this specific job's description
         job_required_skills = clean_extracted_skills(job.get("description", ""))
-        if not job_required_skills:
-            job_required_skills = ["python", "sql"]
+        req_skills_list = list(job_required_skills.keys()) if isinstance(job_required_skills, dict) and job_required_skills else ["python", "sql"]
+        if not req_skills_list:
+            req_skills_list = ["python", "sql"]
         
         # Per-job gap analysis
-        gap = calculate_skill_gap(user_skills, job_required_skills)
+        gap = calculate_skill_gap(user_skills, req_skills_list)
         
-        # Per-job learning roadmap
-        roadmap = suggest_courses(gap["missing_skills"], df_courses)
+        # Per-job learning roadmap with Capstone
+        roadmap = suggest_courses(gap["missing_skills"], df_courses, role=request.target_role, core_skills=req_skills_list)
         
         # Platform links
         links = generate_platform_links(job.get("title", request.target_role))
@@ -90,10 +94,14 @@ def generate_live_pivot_roadmap(request: PivotRequest, current_user: models.User
             "company": job.get("company", "Unknown"),
             "location": job.get("location", "Remote"),
             "apply_url": job.get("apply_url", ""),
+            "salary": job.get("salary", ""),
+            "company_logo": job.get("company_logo", ""),
+            "job_type": job.get("job_type", "Full-Time / Remote"),
+            "description": job.get("description", ""),
             "match_percentage": gap["analysis_summary"]["Match Percentage"],
             "matched_skills": gap["matched_skills"],
             "missing_skills": gap["missing_skills"],
-            "required_skills": job_required_skills,
+            "required_skills": req_skills_list,
             "platform_links": links,
             "roadmap_phases": roadmap,
         })
@@ -101,11 +109,25 @@ def generate_live_pivot_roadmap(request: PivotRequest, current_user: models.User
     # Sort by best match first
     recommended_jobs.sort(key=lambda j: j["match_percentage"], reverse=True)
     
+    # Related career suggestions
+    role_lower = request.target_role.lower()
+    if "ai" in role_lower or "machine learning" in role_lower or "prompt" in role_lower:
+        suggestions = ["Machine Learning Engineer", "NLP Scientist", "AI Product Manager", "Data Engineer"]
+    elif "data" in role_lower:
+        suggestions = ["Data Scientist", "Data Analyst", "Analytics Engineer", "Business Intelligence Developer"]
+    elif "quantum" in role_lower:
+        suggestions = ["Quantum Algorithm Developer", "High Performance Computing Engineer", "Physics Software Engineer", "Research Scientist"]
+    elif "backend" in role_lower or "developer" in role_lower or "software" in role_lower or "engineer" in role_lower:
+        suggestions = ["Cloud Solutions Architect", "DevOps Engineer", "Full Stack Developer", "Systems Engineer"]
+    else:
+        suggestions = ["Software Engineer", "Solutions Architect", "Technical Product Manager", "Systems Analyst"]
+
     return {
         "target_role": request.target_role,
         "user_skills": user_skills,
         "scraped_jobs_count": len(live_jobs),
         "recommended_jobs": recommended_jobs,
+        "suggestions": suggestions,
     }
 
 class CareerPathsRequest(BaseModel):
