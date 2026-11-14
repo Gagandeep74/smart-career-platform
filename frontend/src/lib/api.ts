@@ -285,6 +285,11 @@ export const CareerAPI = {
     if (!response.ok) throw new Error('Unable to improve resume');
     return response.json();
   },
+  async listResumeImprovements() {
+    const response = await fetch(`${API_BASE_URL}/resume/improvements`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load resume improvements');
+    return response.json();
+  },
   async createCoverLetter(data: { title?: string; job_id?: number; application_id?: number; tone?: string; job_description?: string }) {
     const response = await fetch(`${API_BASE_URL}/cover-letters`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
     if (!response.ok) throw new Error('Unable to create cover letter');

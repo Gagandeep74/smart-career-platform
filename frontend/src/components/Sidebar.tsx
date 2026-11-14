@@ -11,6 +11,7 @@ export default function Sidebar() {
     { label: 'Job Hub', icon: Briefcase, path: '/jobs' },
     { label: 'Roadmap', icon: Map, path: '/roadmap' },
     { label: 'Resume Builder', icon: FilePenLine, path: '/resume-builder' },
+    { label: 'Improve Resume', icon: Sparkles, path: '/resume-improvement' },
     { label: 'Certificates', icon: Award, path: '/profile/certificates' },
     { label: 'Applications', icon: ClipboardList, path: '/applications' },
     { label: 'Career Toolkit', icon: Sparkles, path: '/career-toolkit' },

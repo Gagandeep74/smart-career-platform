@@ -366,6 +366,9 @@ export default function V2DashboardPage() {
           <Link href="/resume-builder" className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 transition-all font-bold text-xs text-emerald-400 uppercase tracking-widest whitespace-nowrap">
             <FilePenLine className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Resume Maker</span>
           </Link>
+          <Link href="/resume-improvement" className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-all font-bold text-xs text-purple-300 uppercase tracking-widest whitespace-nowrap">
+            <Sparkles className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Improve Resume</span>
+          </Link>
           
           <div className="flex items-center gap-3 px-3 sm:px-4 py-1.5 sm:py-2 bg-slate-900/50 rounded-full border border-white/10 shadow-sm">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
