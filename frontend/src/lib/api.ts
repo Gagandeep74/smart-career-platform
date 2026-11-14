@@ -278,5 +278,56 @@ export const CareerAPI = {
     });
     if (!response.ok) throw new Error('Unable to restore resume version');
     return response.json();
+  },
+
+  async improveResume(data: { resume_id?: number; job_description?: string }) {
+    const response = await fetch(`${API_BASE_URL}/resume/improve`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to improve resume');
+    return response.json();
+  },
+  async createCoverLetter(data: { title?: string; job_id?: number; application_id?: number; tone?: string; job_description?: string }) {
+    const response = await fetch(`${API_BASE_URL}/cover-letters`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to create cover letter');
+    return response.json();
+  },
+  async matchJob(data: { job_id?: number; job_description: string }) {
+    const response = await fetch(`${API_BASE_URL}/jobs/match`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to match job');
+    return response.json();
+  },
+  async createInterview(role: string, job_id?: number) {
+    const response = await fetch(`${API_BASE_URL}/interviews`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ role, job_id }) });
+    if (!response.ok) throw new Error('Unable to create interview');
+    return response.json();
+  },
+  async answerInterview(sessionId: number, question_index: number, answer: string) {
+    const response = await fetch(`${API_BASE_URL}/interviews/${sessionId}/answers`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify({ question_index, answer }) });
+    if (!response.ok) throw new Error('Unable to evaluate answer');
+    return response.json();
+  },
+  async createReminder(data: { title: string; reminder_type?: string; due_at: string; notes?: string }) {
+    const response = await fetch(`${API_BASE_URL}/reminders`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to create reminder');
+    return response.json();
+  },
+  async savePortfolio(data: { slug: string; headline: string; bio: string; is_public: boolean }) {
+    const response = await fetch(`${API_BASE_URL}/portfolio`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to save portfolio');
+    return response.json();
+  },
+  async optimizeLinkedIn() {
+    const response = await fetch(`${API_BASE_URL}/linkedin/optimize`, { method: 'POST', headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to optimize LinkedIn profile');
+    return response.json();
+  },
+  async createJobAlert(data: { name: string; role?: string; location?: string; skills?: string[]; frequency?: string }) {
+    const response = await fetch(`${API_BASE_URL}/job-alerts`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() }, body: JSON.stringify(data) });
+    if (!response.ok) throw new Error('Unable to create job alert');
+    return response.json();
+  },
+  async getCareerAnalytics() {
+    const response = await fetch(`${API_BASE_URL}/analytics/career`, { headers: getAuthHeaders() });
+    if (!response.ok) throw new Error('Unable to load career analytics');
+    return response.json();
   }
 };

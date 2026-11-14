@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from backend.core.database import init_db
-from backend.api import routes_resume, routes_jobs, routes_learning, routes_analytics, routes_auth, routes_profile
+from backend.api import routes_resume, routes_jobs, routes_learning, routes_analytics, routes_auth, routes_profile, routes_career_toolkit
 
 app = FastAPI(
     title="Smart Career & Resume AI Platform",
@@ -66,6 +66,7 @@ app.include_router(routes_jobs.router, prefix="/api/v1")
 app.include_router(routes_learning.router, prefix="/api/v1")
 app.include_router(routes_analytics.router, prefix="/api/v1")
 app.include_router(routes_profile.router, prefix="/api/v1")
+app.include_router(routes_career_toolkit.router, prefix="/api/v1")
 
 @app.get("/")
 def check_health():
